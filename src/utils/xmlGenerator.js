@@ -35,6 +35,11 @@ export function generateXml(field) {
     parts.push(buildTag('deleteConstraint', field.deleteConstraint))
   }
   
+  // description (NEW! - Added support for field description)
+  if (field.description) {
+    parts.push(buildTag('description', field.description))
+  }
+  
   // externalId (always include true or false)
   if (field.externalId !== undefined) {
     parts.push(buildTag('externalId', field.externalId === true ? 'true' : 'false'))
@@ -50,7 +55,7 @@ export function generateXml(field) {
     parts.push(buildTag('formulaTreatBlanksAs', field.treatBlanksAs || 'BlankAsZero'))
   }
   
-  // inlineHelpText
+  // inlineHelpText (separate from description)
   if (field.helpText) {
     parts.push(buildTag('inlineHelpText', field.helpText))
   }
