@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Upload, FileJson, AlertCircle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
+import { Upload, FileJson, AlertCircle, CheckCircle, Clock, RefreshCw, Eye, FileText, AlertTriangle } from 'lucide-react';
 import { generateFieldsFromAI } from '../utils/aiGenerator';
 import { parseFile, isValidFileType, isValidFileSize, getFileTypeName, formatFileSize } from '../utils/fileParser';
 
@@ -12,7 +12,7 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
   const [generationProgress, setGenerationProgress] = useState('');
   const [error, setError] = useState('');
   
-  // NEW: Enhanced progress tracking
+  // Enhanced progress tracking
   const [progressDetails, setProgressDetails] = useState({
     step: 0,
     totalSteps: 4,
@@ -20,11 +20,16 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
     estimatedTimeRemaining: 0
   });
   
-  // NEW: Partial success handling
+  // Partial success handling
   const [partialResult, setPartialResult] = useState(null);
   const [generationStartTime, setGenerationStartTime] = useState(0);
+  
+  // NEW: File analysis and preview
+  const [fileAnalysis, setFileAnalysis] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewText, setPreviewText] = useState('');
 
-  // NEW: Calculate estimated time remaining
+  // Calculate estimated time remaining
   useEffect(() => {
     if (isGenerating && generationStartTime > 0) {
       const interval = setInterval(() => {
@@ -42,6 +47,68 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
       return () => clearInterval(interval);
     }
   }, [isGenerating, progressDetails.step, generationStartTime, progressDetails.totalSteps]);
+
+  // NEW: Analyze uploaded content
+  const analyzeContent = (text, fileName = '') => {
+    const sizeKB = (text.length / 1024).toFixed(1);
+    const lines = text.split('\n').length;
+    
+    // Count potential fields
+    const fieldPatterns = [
+      /^###?\s+\*?\*?\d+\./gm,
+      /Field Label:/gmi,
+      /API Name:\s*\w+__c/gmi
+    ];
+    
+    let fieldCount = 0;
+    fieldPatterns.forEach(pattern => {
+      const matches = text.match(pattern);
+      if (matches) fieldCount = Math.max(fieldCount, matches.length);
+    });
+    
+    // Detect format
+    let format = 'Plain Text';
+    if (text.includes('###') || text.includes('##')) format = 'Markdown';
+    if (text.includes('Field Label:') && text.includes('API Name:')) format = 'Structured';
+    
+    // Check for non-field sections
+    const nonFieldSections = [
+      'Validation Rules', 'Page Layouts', 'Workflows', 
+      'Lightning Components', 'Reports', 'Integration Points'
+    ];
+    const hasNonFieldSections = nonFieldSections.some(section => 
+      text.toLowerCase().includes(section.toLowerCase())
+    );
+    
+    // Determine size warning level
+    let sizeWarning = null;
+    if (parseFloat(sizeKB) > 80) {
+      sizeWarning = {
+        level: 'high',
+        message: `Very large file (${sizeKB}KB). Processing may take 30-60 seconds and might miss some fields.`,
+        suggestion: 'Consider splitting into smaller files or removing non-field sections.'
+      };
+    } else if (parseFloat(sizeKB) > 50) {
+      sizeWarning = {
+        level: 'medium',
+        message: `Large file (${sizeKB}KB). Processing may take 20-30 seconds.`,
+        suggestion: 'Everything should work, but larger files have higher chance of issues.'
+      };
+    }
+    
+    const analysis = {
+      fileName,
+      sizeKB,
+      lines,
+      fieldCount,
+      format,
+      hasNonFieldSections,
+      sizeWarning
+    };
+    
+    setFileAnalysis(analysis);
+    return analysis;
+  };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -64,6 +131,7 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
     if (!file) return;
     setError('');
     setGenerationProgress('');
+    setFileAnalysis(null);
 
     if (!isValidFileType(file)) {
       setError(`Unsupported file type. Please upload .txt, .md, or .docx files.`);
@@ -83,11 +151,39 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
       setAiInput(text);
       setGenerationProgress('');
       setUploadedFileName(file.name);
+      
+      // Analyze the content
+      analyzeContent(text, file.name);
     } catch (error) {
       setError(error.message);
       setGenerationProgress('');
       setUploadedFileName('');
+      setFileAnalysis(null);
     }
+  };
+
+  // NEW: Handle text paste and analyze
+  const handleTextChange = (text) => {
+    setAiInput(text);
+    if (text.trim().length > 100) {
+      analyzeContent(text, 'Pasted Text');
+    } else {
+      setFileAnalysis(null);
+    }
+  };
+
+  // NEW: Show preview of what will be sent to AI
+  const handleShowPreview = () => {
+    // Simulate the extraction process
+    let preview = aiInput;
+    
+    // Show first 3000 characters of what will be processed
+    if (preview.length > 3000) {
+      preview = preview.substring(0, 3000) + '\n\n... (truncated for preview)';
+    }
+    
+    setPreviewText(preview);
+    setShowPreview(true);
   };
 
   const handleAiGenerate = async () => {
@@ -119,7 +215,7 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
         estimatedTimeRemaining: 15
       });
       setGenerationProgress('Step 1/4: Normalizing text...');
-      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for UI
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Step 2: Extract field specifications
       setProgressDetails({
@@ -135,8 +231,8 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
       setProgressDetails({
         step: 3,
         totalSteps: 4,
-        currentTask: 'Processing with AI (this may take 10-20 seconds)...',
-        estimatedTimeRemaining: 10
+        currentTask: 'Processing with AI (this may take 10-30 seconds)...',
+        estimatedTimeRemaining: fileAnalysis?.sizeKB > 50 ? 25 : 15
       });
       setGenerationProgress('Step 3/4: AI is generating fields...');
       
@@ -154,14 +250,23 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
       const jsonString = JSON.stringify(result, null, 2);
       setJsonText(jsonString);
       
-      // Success!
+      // Success - check if we got expected number of fields
+      const expectedFields = fileAnalysis?.fieldCount || 0;
+      const actualFields = result.fields.length;
+      
+      let successMessage = `✅ Successfully generated ${actualFields} fields!`;
+      
+      if (expectedFields > 0 && actualFields < expectedFields * 0.9) {
+        successMessage += `\n⚠️ Expected ~${expectedFields} fields, got ${actualFields}. Some may have been skipped.`;
+      }
+      
       setProgressDetails({
         step: 4,
         totalSteps: 4,
         currentTask: 'Complete!',
         estimatedTimeRemaining: 0
       });
-      setGenerationProgress(`✅ Successfully generated ${result.fields.length} fields!`);
+      setGenerationProgress(successMessage);
       
       setTimeout(() => {
         setActiveMethod('paste');
@@ -172,7 +277,7 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
           currentTask: '',
           estimatedTimeRemaining: 0
         });
-      }, 1500);
+      }, 2000);
       
     } catch (error) {
       setGenerationProgress('');
@@ -194,7 +299,7 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
         errorMessage = `Generation partially completed. ${errorMessage}\n\n✅ Some fields were generated. You can import them below or retry.`;
       } else {
         if (error.message.includes('invalid JSON') || error.message.includes('parse')) {
-          errorMessage += '\n\n💡 Suggestions:\n• Try simplifying your field descriptions\n• Remove special characters\n• Break into smaller sections';
+          errorMessage += '\n\n💡 Suggestions:\n• Try removing non-field sections (Validation Rules, Workflows, etc.)\n• Split large files into smaller chunks\n• Simplify field descriptions';
         }
       }
       
@@ -205,14 +310,14 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
     }
   };
 
-  // NEW: Retry with same input
+  // Retry with same input
   const handleRetry = () => {
     setError('');
     setPartialResult(null);
     handleAiGenerate();
   };
 
-  // NEW: Import partial results
+  // Import partial results
   const handleImportPartial = () => {
     if (partialResult && partialResult.json) {
       try {
@@ -243,7 +348,7 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
     setPartialResult(null);
   };
 
-  // NEW: Format time remaining
+  // Format time remaining
   const formatTime = (seconds) => {
     if (seconds <= 0) return 'Finishing...';
     if (seconds < 60) return `~${seconds}s remaining`;
@@ -260,7 +365,7 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
 
   const modalStyle = {
     backgroundColor: darkMode ? '#1e293b' : '#ffffff', borderRadius: '16px',
-    padding: '32px', maxWidth: '800px', width: '90%', maxHeight: '90vh',
+    padding: '32px', maxWidth: '900px', width: '90%', maxHeight: '90vh',
     overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
   };
 
@@ -302,7 +407,6 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
           </div>
         )}
 
-        {/* NEW: Partial results actions */}
         {partialResult && (
           <div style={{
             padding: '12px 16px', backgroundColor: darkMode ? 'rgba(234, 179, 8, 0.1)' : '#fefce8',
@@ -365,9 +469,89 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
               </div>
             )}
             
+            {/* NEW: File Analysis Warning */}
+            {fileAnalysis && fileAnalysis.sizeWarning && (
+              <div style={{
+                padding: '12px 16px',
+                backgroundColor: fileAnalysis.sizeWarning.level === 'high' 
+                  ? (darkMode ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2')
+                  : (darkMode ? 'rgba(234, 179, 8, 0.1)' : '#fefce8'),
+                border: `1px solid ${fileAnalysis.sizeWarning.level === 'high' 
+                  ? (darkMode ? '#dc2626' : '#fecaca')
+                  : (darkMode ? '#ca8a04' : '#fde047')}`,
+                borderRadius: '8px',
+                marginBottom: '12px'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-start', 
+                  gap: '8px',
+                  marginBottom: '8px'
+                }}>
+                  <AlertTriangle 
+                    size={16} 
+                    style={{ 
+                      color: fileAnalysis.sizeWarning.level === 'high' ? '#ef4444' : '#f59e0b',
+                      flexShrink: 0,
+                      marginTop: '2px'
+                    }} 
+                  />
+                  <div style={{ 
+                    fontSize: '0.8125rem',
+                    color: fileAnalysis.sizeWarning.level === 'high' 
+                      ? (darkMode ? '#fca5a5' : '#dc2626')
+                      : (darkMode ? '#fbbf24' : '#ca8a04')
+                  }}>
+                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                      {fileAnalysis.sizeWarning.message}
+                    </div>
+                    <div>{fileAnalysis.sizeWarning.suggestion}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* NEW: File Analysis Info */}
+            {fileAnalysis && (
+              <div style={{
+                padding: '12px 16px',
+                backgroundColor: darkMode ? '#0f172a' : '#f8fafc',
+                border: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
+                borderRadius: '8px',
+                marginBottom: '12px',
+                fontSize: '0.75rem',
+                color: darkMode ? '#cbd5e1' : '#475569'
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                  <div>
+                    <strong>Format:</strong> {fileAnalysis.format}
+                  </div>
+                  <div>
+                    <strong>Size:</strong> {fileAnalysis.sizeKB} KB
+                  </div>
+                  <div>
+                    <strong>Lines:</strong> {fileAnalysis.lines}
+                  </div>
+                  <div>
+                    <strong>Estimated Fields:</strong> ~{fileAnalysis.fieldCount}
+                  </div>
+                </div>
+                {fileAnalysis.hasNonFieldSections && (
+                  <div style={{ 
+                    marginTop: '8px', 
+                    paddingTop: '8px', 
+                    borderTop: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
+                    color: darkMode ? '#fbbf24' : '#ca8a04'
+                  }}>
+                    ⚠️ Contains non-field sections (Validation Rules, etc.) - these will be removed
+                  </div>
+                )}
+              </div>
+            )}
+            
             <textarea
               value={aiInput}
-              onChange={(e) => setAiInput(e.target.value)}
+              onChange={(e) => handleTextChange(e.target.value)}
               placeholder="Paste field specifications here...\n\nExample:\n- Patient Name (Lookup to Contact, Required)\n- Lab Order Date (Date, Required)\n- Test Results (Long Text, 5000 chars)"
               style={{
                 width: '100%', minHeight: '300px', padding: '12px',
@@ -378,18 +562,88 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
               }}
             />
             
-            <div style={{ marginBottom: '16px' }}>
-              <input type="file" accept=".md,.txt,.doc,.docx" onChange={handleAiFileUpload}
-                style={{ display: 'none' }} id="aiFileInput" />
-              <label htmlFor="aiFileInput" style={{
-                display: 'inline-block', padding: '8px 16px',
-                backgroundColor: darkMode ? '#334155' : '#e2e8f0',
-                color: darkMode ? '#cbd5e1' : '#334155', borderRadius: '6px',
-                fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer'
-              }}>📄 Upload File (.txt, .md, .docx)</label>
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <input type="file" accept=".md,.txt,.doc,.docx" onChange={handleAiFileUpload}
+                  style={{ display: 'none' }} id="aiFileInput" />
+                <label htmlFor="aiFileInput" style={{
+                  display: 'inline-block', padding: '8px 16px',
+                  backgroundColor: darkMode ? '#334155' : '#e2e8f0',
+                  color: darkMode ? '#cbd5e1' : '#334155', borderRadius: '6px',
+                  fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '6px'
+                }}>
+                  <FileText size={16} />
+                  Upload File (.txt, .md, .docx)
+                </label>
+              </div>
+              
+              {/* NEW: Preview Button */}
+              {aiInput.trim() && (
+                <button onClick={handleShowPreview} style={{
+                  padding: '8px 16px',
+                  backgroundColor: darkMode ? '#1e40af' : '#dbeafe',
+                  color: darkMode ? '#93c5fd' : '#1e40af',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <Eye size={16} />
+                  Preview What AI Sees
+                </button>
+              )}
             </div>
 
-            {/* NEW: Enhanced progress display with time estimate */}
+            {/* NEW: Preview Modal */}
+            {showPreview && (
+              <div style={{
+                marginBottom: '16px',
+                padding: '16px',
+                backgroundColor: darkMode ? '#0f172a' : '#f8fafc',
+                border: `2px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
+                borderRadius: '8px',
+                maxHeight: '300px',
+                overflow: 'auto'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: '12px'
+                }}>
+                  <h4 style={{ 
+                    fontSize: '0.875rem', 
+                    fontWeight: 600,
+                    color: darkMode ? '#cbd5e1' : '#334155'
+                  }}>
+                    Preview (First 3000 chars)
+                  </h4>
+                  <button onClick={() => setShowPreview(false)} style={{
+                    background: 'none',
+                    border: 'none',
+                    color: darkMode ? '#94a3b8' : '#64748b',
+                    cursor: 'pointer',
+                    fontSize: '1rem'
+                  }}>×</button>
+                </div>
+                <pre style={{
+                  fontSize: '0.75rem',
+                  fontFamily: 'monospace',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  color: darkMode ? '#cbd5e1' : '#334155',
+                  margin: 0
+                }}>
+                  {previewText}
+                </pre>
+              </div>
+            )}
+
             {generationProgress && (
               <div style={{
                 padding: '16px', backgroundColor: darkMode ? '#0f172a' : '#eff6ff',
@@ -426,7 +680,6 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
                   )}
                 </div>
                 
-                {/* Progress bar */}
                 {progressDetails.step > 0 && (
                   <div style={{ marginBottom: '8px' }}>
                     <div style={{
