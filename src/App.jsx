@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Settings, Download, Moon, Sun, FileText, Trash2, Copy, Check, AlertCircle, Plus, X, Upload } from 'lucide-react'
+import { Settings, Download, Moon, Sun, FileText, Trash2, Copy, Check, AlertCircle, Plus, X, Upload, Menu } from 'lucide-react'
 import JSZip from 'jszip'
 import { generateXml } from './utils/xmlGenerator'
 import ImportModal from './components/ImportModal'
@@ -962,7 +962,7 @@ function Tabs({ activeTab, onTabChange, darkMode }) {
   )
 }
 
-function Header({ onDownload, darkMode, onToggleDark }) {
+function Header({ onDownload, darkMode, onToggleDark, onToggleSidebar, isMobile }) {
   const styles = {
     header: {
       padding: '16px 24px',
@@ -1023,12 +1023,31 @@ function Header({ onDownload, darkMode, onToggleDark }) {
       alignItems: 'center',
       justifyContent: 'center',
       color: darkMode ? '#f59e0b' : '#6366f1'
+    },
+    hamburger: {
+      padding: '8px',
+      border: 'none',
+      background: 'none',
+      color: darkMode ? '#f1f5f9' : '#0f172a',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      marginRight: '8px'
     }
   }
 
   return (
     <div style={styles.header}>
       <div style={styles.left}>
+        {isMobile && (
+          <button 
+            onClick={onToggleSidebar}
+            style={styles.hamburger}
+            aria-label="Toggle menu"
+          >
+            <Menu size={24} />
+          </button>
+        )}
         <div style={styles.logo}>
           <Settings size={24} />
         </div>
@@ -1147,14 +1166,23 @@ function FieldItem({ field, isSelected, onSelect, onDelete, darkMode }) {
   )
 }
 
-function Sidebar({ fields, allFields, selectedId, onSelect, onDelete, onAdd, onImport, darkMode, fieldTypeFilter, onFilterChange, generalCount, lookupCount, formulaCount, onDownloadByCategory }) {
+function Sidebar({ fields, allFields, selectedId, onSelect, onDelete, onAdd, onImport, darkMode, fieldTypeFilter, onFilterChange, generalCount, lookupCount, formulaCount, onDownloadByCategory, isOpen, onClose, isMobile }) {
   const styles = {
     sidebar: {
-      width: '320px',
+      width: isMobile ? '280px' : '320px',
       borderRight: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: darkMode ? '#1e293b' : '#ffffff'
+      backgroundColor: darkMode ? '#1e293b' : '#ffffff',
+      ...(isMobile && {
+        position: 'fixed',
+        top: 0,
+        left: isOpen ? 0 : '-280px',
+        bottom: 0,
+        zIndex: 1000,
+        transition: 'left 0.3s ease',
+        boxShadow: isOpen ? '2px 0 8px rgba(0,0,0,0.2)' : 'none'
+      })
     },
     header: {
       padding: '16px',
@@ -1254,6 +1282,21 @@ function Sidebar({ fields, allFields, selectedId, onSelect, onDelete, onAdd, onI
       alignItems: 'center',
       justifyContent: 'center',
       gap: '6px'
+    },
+    mobileHeader: {
+      padding: '12px',
+      borderBottom: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}`,
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    },
+    closeButton: {
+      padding: '4px',
+      border: 'none',
+      background: 'none',
+      color: darkMode ? '#cbd5e1' : '#64748b',
+      cursor: 'pointer',
+      fontSize: '24px'
     }
   }
 
@@ -1267,75 +1310,100 @@ function Sidebar({ fields, allFields, selectedId, onSelect, onDelete, onAdd, onI
   }
 
   return (
-    <div style={styles.sidebar}>
-      <div style={styles.header}>
-        <div style={styles.title}>Field Definitions</div>
-        <button style={styles.addButton} onClick={onAdd}>
-          <FileText size={16} />
-          Add New Field
-        </button>
-        <button style={styles.importButton} onClick={onImport}>
-          <Upload size={16} />
-          Import JSON
-        </button>
-      </div>
-
-      <div style={styles.filterTabs}>
-        <button 
-          style={styles.filterButton(fieldTypeFilter === 'all')} 
-          onClick={() => onFilterChange('all')}
-        >
-          <span>🗃️ All Fields</span>
-          <span style={styles.badge}>{allFields.length}</span>
-        </button>
-        <button 
-          style={styles.filterButton(fieldTypeFilter === 'general')} 
-          onClick={() => onFilterChange('general')}
-        >
-          <span>🗂️ General</span>
-          <span style={styles.badge}>{generalCount}</span>
-        </button>
-        <button 
-          style={styles.filterButton(fieldTypeFilter === 'lookup')} 
-          onClick={() => onFilterChange('lookup')}
-        >
-          <span>🔍 Lookup</span>
-          <span style={styles.badge}>{lookupCount}</span>
-        </button>
-        <button 
-          style={styles.filterButton(fieldTypeFilter === 'formula')} 
-          onClick={() => onFilterChange('formula')}
-        >
-          <span>🧮 Formula</span>
-          <span style={styles.badge}>{formulaCount}</span>
-        </button>
+    <>
+      {isMobile && isOpen && (
+        <div 
+          onClick={onClose}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+            transition: 'opacity 0.3s ease'
+          }}
+        />
+      )}
+      
+      <div style={styles.sidebar}>
+        {isMobile && (
+          <div style={styles.mobileHeader}>
+            <span style={{ fontWeight: 600 }}>Menu</span>
+            <button onClick={onClose} style={styles.closeButton}>×</button>
+          </div>
+        )}
         
-        <button 
-          style={styles.downloadCategoryBtn}
-          onClick={() => onDownloadByCategory(fieldTypeFilter)}
-        >
-          <Download size={14} />
-          Download {getCategoryLabel()}
-        </button>
-      </div>
+        <div style={styles.header}>
+          <div style={styles.title}>Field Definitions</div>
+          <button style={styles.addButton} onClick={onAdd}>
+            <FileText size={16} />
+            Add New Field
+          </button>
+          <button style={styles.importButton} onClick={onImport}>
+            <Upload size={16} />
+            Import JSON
+          </button>
+        </div>
 
-      <div style={styles.list}>
-        {fields.map(field => (
-          <FieldItem
-            key={field.id}
-            field={field}
-            isSelected={field.id === selectedId}
-            onSelect={() => onSelect(field.id)}
-            onDelete={() => onDelete(field.id)}
-            darkMode={darkMode}
-          />
-        ))}
-      </div>
+        <div style={styles.filterTabs}>
+          <button 
+            style={styles.filterButton(fieldTypeFilter === 'all')} 
+            onClick={() => onFilterChange('all')}
+          >
+            <span>🗃️ All Fields</span>
+            <span style={styles.badge}>{allFields.length}</span>
+          </button>
+          <button 
+            style={styles.filterButton(fieldTypeFilter === 'general')} 
+            onClick={() => onFilterChange('general')}
+          >
+            <span>🗂️ General</span>
+            <span style={styles.badge}>{generalCount}</span>
+          </button>
+          <button 
+            style={styles.filterButton(fieldTypeFilter === 'lookup')} 
+            onClick={() => onFilterChange('lookup')}
+          >
+            <span>🔗 Lookup</span>
+            <span style={styles.badge}>{lookupCount}</span>
+          </button>
+          <button 
+            style={styles.filterButton(fieldTypeFilter === 'formula')} 
+            onClick={() => onFilterChange('formula')}
+          >
+            <span>🧮 Formula</span>
+            <span style={styles.badge}>{formulaCount}</span>
+          </button>
+          
+          <button 
+            style={styles.downloadCategoryBtn}
+            onClick={() => onDownloadByCategory(fieldTypeFilter)}
+          >
+            <Download size={14} />
+            Download {getCategoryLabel()}
+          </button>
+        </div>
 
-      <div style={styles.footer}>
-        {fields.length} {fieldTypeFilter === 'all' ? 'Total' : getCategoryLabel()} Field{fields.length !== 1 ? 's' : ''}
+        <div style={styles.list}>
+          {fields.map(field => (
+            <FieldItem
+              key={field.id}
+              field={field}
+              isSelected={field.id === selectedId}
+              onSelect={() => onSelect(field.id)}
+              onDelete={() => onDelete(field.id)}
+              darkMode={darkMode}
+            />
+          ))}
+        </div>
+
+        <div style={styles.footer}>
+          {fields.length} {fieldTypeFilter === 'all' ? 'Total' : getCategoryLabel()} Field{fields.length !== 1 ? 's' : ''}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -1353,6 +1421,21 @@ function App() {
     }
     return true
   })
+  
+  // NEW: Mobile state
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // NEW: Detect mobile screen size
+  useState(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const selectedField = fields.find(f => f.id === selectedId)
 
@@ -1392,6 +1475,9 @@ function App() {
     setFields([...fields, newField])
     setSelectedId(newField.id)
     setActiveTab('editor')
+    if (isMobile) {
+      setSidebarOpen(false)
+    }
   }
 
   const handleDeleteField = (id) => {
@@ -1404,6 +1490,14 @@ function App() {
 
   const handleUpdateField = (updatedField) => {
     setFields(fields.map(f => f.id === updatedField.id ? updatedField : f))
+  }
+
+  // NEW: Close sidebar when selecting field on mobile
+  const handleSelectField = (id) => {
+    setSelectedId(id)
+    if (isMobile) {
+      setSidebarOpen(false)
+    }
   }
 
   const handleDownload = async () => {
@@ -1510,9 +1604,18 @@ function App() {
   const rootStyles = {
     height: '100vh',
     display: 'flex',
+    flexDirection: 'column',
     backgroundColor: darkMode ? '#020617' : '#f1f5f9',
     color: darkMode ? '#f1f5f9' : '#0f172a',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    overflow: 'hidden'
+  }
+
+  const contentStyles = {
+    display: 'flex',
+    flex: 1,
+    overflow: 'hidden',
+    position: 'relative'
   }
 
   return (
@@ -1525,62 +1628,75 @@ function App() {
         />
       )}
 
-      <Sidebar 
-        fields={filteredFields}
-        allFields={fields}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
-        onDelete={handleDeleteField}
-        onAdd={handleAddField}
-        onImport={() => setShowImportModal(true)}
+      <Header 
+        onDownload={handleDownload}
         darkMode={darkMode}
-        fieldTypeFilter={fieldTypeFilter}
-        onFilterChange={setFieldTypeFilter}
-        generalCount={generalFields.length}
-        lookupCount={lookupFields.length}
-        formulaCount={formulaFields.length}
-        onDownloadByCategory={handleDownloadByCategory}
+        onToggleDark={toggleDarkMode}
+        onToggleSidebar={() => setSidebarOpen(true)}
+        isMobile={isMobile}
       />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <Header 
-          onDownload={handleDownload}
+      <div style={contentStyles}>
+        <Sidebar 
+          fields={filteredFields}
+          allFields={fields}
+          selectedId={selectedId}
+          onSelect={handleSelectField}
+          onDelete={handleDeleteField}
+          onAdd={handleAddField}
+          onImport={() => setShowImportModal(true)}
           darkMode={darkMode}
-          onToggleDark={toggleDarkMode}
+          fieldTypeFilter={fieldTypeFilter}
+          onFilterChange={setFieldTypeFilter}
+          generalCount={generalFields.length}
+          lookupCount={lookupFields.length}
+          formulaCount={formulaFields.length}
+          onDownloadByCategory={handleDownloadByCategory}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          isMobile={isMobile}
         />
 
-        {selectedField ? (
-          <>
-            <Tabs 
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              darkMode={darkMode}
-            />
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          minWidth: 0,
+          overflow: 'hidden'
+        }}>
+          {selectedField ? (
+            <>
+              <Tabs 
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                darkMode={darkMode}
+              />
 
-            <div style={{ 
-              flex: 1, 
-              overflow: 'auto', 
-              padding: '24px',
-              backgroundColor: darkMode ? '#0f172a' : '#f8fafc'
-            }}>
-              {activeTab === 'editor' ? (
-                <FieldEditor 
-                  field={selectedField}
-                  onChange={handleUpdateField}
-                  darkMode={darkMode}
-                />
-              ) : (
-                <XmlPreview 
-                  field={selectedField}
-                  darkMode={darkMode}
-                  onDownloadSingle={() => handleDownloadSingleField(selectedField)}
-                />
-              )}
-            </div>
-          </>
-        ) : (
-          <EmptyState darkMode={darkMode} />
-        )}
+              <div style={{ 
+                flex: 1, 
+                overflow: 'auto', 
+                padding: '24px',
+                backgroundColor: darkMode ? '#0f172a' : '#f8fafc'
+              }}>
+                {activeTab === 'editor' ? (
+                  <FieldEditor 
+                    field={selectedField}
+                    onChange={handleUpdateField}
+                    darkMode={darkMode}
+                  />
+                ) : (
+                  <XmlPreview 
+                    field={selectedField}
+                    darkMode={darkMode}
+                    onDownloadSingle={() => handleDownloadSingleField(selectedField)}
+                  />
+                )}
+              </div>
+            </>
+          ) : (
+            <EmptyState darkMode={darkMode} />
+          )}
+        </div>
       </div>
     </div>
   )
