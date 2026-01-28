@@ -53,30 +53,61 @@ export function normalizeCharacters(text) {
 export function cutoffAfterFields(text) {
   const lines = text.split('\n');
   
-  // STEP 1: Find the last field definition
+  // STEP 1: Find the last REAL field definition (with __c)
   let lastFieldLine = -1;
-  const fieldPatterns = [
-    /^###?\s+\*?\*?\d+\./,                    // ### **1. Field_Name** or ### 1.
-    /^###?\s+\d+\./,                          // ### 1. Field_Name
-    /^Field Label:/im,                        // Plain text format
-    /API Name:\s*\w+__c/im,                   // Any line with API name ending in __c
-    /Data Type:/im,                           // Data Type: indicator
-    /^```\s*$/m,                              // Code block ending (often after field)
-  ];
+  let foundRealField = false;
   
-  // Find the last line that looks like a field definition
+  // Look for the last field that has __c in the name (real Salesforce field)
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim();
-    if (fieldPatterns.some(pattern => pattern.test(line))) {
-      // Double-check this isn't in a validation rule or workflow section
+    const lowerLine = line.toLowerCase();
+    
+    // Skip if in non-field sections
+    const isNonFieldSection = 
+      lowerLine.includes('validation') || 
+      lowerLine.includes('workflow') ||
+      lowerLine.includes('error condition') ||
+      lowerLine.includes('error message') ||
+      lowerLine.includes('dashboard') ||
+      lowerLine.includes('report') ||
+      lowerLine.includes('page layout') ||
+      lowerLine.includes('lightning component');
+    
+    if (isNonFieldSection) {
+      continue;
+    }
+    
+    // Check if this looks like a field header with __c
+    if (/^###?\s+\*?\*?\d+\.\s+\w+__c/i.test(line)) {
+      lastFieldLine = i;
+      foundRealField = true;
+      break;
+    }
+  }
+  
+  // If we didn't find a field with __c, look for other field indicators
+  if (!foundRealField) {
+    const fieldPatterns = [
+      /API Name:\s*\w+__c/im,                   // Any line with API name ending in __c
+      /^Field Label:/im,                        // Plain text format
+      /Data Type:/im,                           // Data Type: indicator
+    ];
+    
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
       const lowerLine = line.toLowerCase();
-      const isValidationOrWorkflow = 
+      
+      const isNonFieldSection = 
         lowerLine.includes('validation') || 
         lowerLine.includes('workflow') ||
-        lowerLine.includes('error condition') ||
-        lowerLine.includes('error message');
+        lowerLine.includes('dashboard') ||
+        lowerLine.includes('report');
       
-      if (!isValidationOrWorkflow) {
+      if (isNonFieldSection) {
+        continue;
+      }
+      
+      if (fieldPatterns.some(pattern => pattern.test(line))) {
         lastFieldLine = i;
         break;
       }
