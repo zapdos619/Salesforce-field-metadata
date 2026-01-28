@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Upload, FileJson, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Upload, FileJson, AlertCircle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
 import { generateFieldsFromAI } from '../utils/aiGenerator';
 import { parseFile, isValidFileType, isValidFileSize, getFileTypeName, formatFileSize } from '../utils/fileParser';
 
@@ -11,6 +11,37 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [generationProgress, setGenerationProgress] = useState('');
   const [error, setError] = useState('');
+  
+  // NEW: Enhanced progress tracking
+  const [progressDetails, setProgressDetails] = useState({
+    step: 0,
+    totalSteps: 4,
+    currentTask: '',
+    estimatedTimeRemaining: 0
+  });
+  
+  // NEW: Partial success handling
+  const [partialResult, setPartialResult] = useState(null);
+  const [generationStartTime, setGenerationStartTime] = useState(0);
+
+  // NEW: Calculate estimated time remaining
+  useEffect(() => {
+    if (isGenerating && generationStartTime > 0) {
+      const interval = setInterval(() => {
+        const elapsed = (Date.now() - generationStartTime) / 1000; // seconds
+        const avgTimePerStep = elapsed / Math.max(progressDetails.step, 1);
+        const stepsRemaining = progressDetails.totalSteps - progressDetails.step;
+        const estimated = Math.ceil(avgTimePerStep * stepsRemaining);
+        
+        setProgressDetails(prev => ({
+          ...prev,
+          estimatedTimeRemaining: Math.max(0, estimated)
+        }));
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isGenerating, progressDetails.step, generationStartTime, progressDetails.totalSteps]);
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -66,29 +97,130 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
     }
 
     setIsGenerating(true);
-    setGenerationProgress('Analyzing field specifications...');
+    setGenerationProgress('Starting generation...');
     setError('');
+    setPartialResult(null);
+    setGenerationStartTime(Date.now());
+    
+    // Reset progress
+    setProgressDetails({
+      step: 0,
+      totalSteps: 4,
+      currentTask: 'Initializing...',
+      estimatedTimeRemaining: 0
+    });
 
     try {
-      setGenerationProgress('Processing with AI...');
+      // Step 1: Normalize characters
+      setProgressDetails({
+        step: 1,
+        totalSteps: 4,
+        currentTask: 'Normalizing special characters...',
+        estimatedTimeRemaining: 15
+      });
+      setGenerationProgress('Step 1/4: Normalizing text...');
+      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for UI
+      
+      // Step 2: Extract field specifications
+      setProgressDetails({
+        step: 2,
+        totalSteps: 4,
+        currentTask: 'Extracting field specifications...',
+        estimatedTimeRemaining: 12
+      });
+      setGenerationProgress('Step 2/4: Analyzing document structure...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Step 3: Process with AI
+      setProgressDetails({
+        step: 3,
+        totalSteps: 4,
+        currentTask: 'Processing with AI (this may take 10-20 seconds)...',
+        estimatedTimeRemaining: 10
+      });
+      setGenerationProgress('Step 3/4: AI is generating fields...');
+      
       const result = await generateFieldsFromAI(aiInput);
-      setGenerationProgress('Converting to JSON...');
+      
+      // Step 4: Converting to JSON
+      setProgressDetails({
+        step: 4,
+        totalSteps: 4,
+        currentTask: 'Converting to JSON...',
+        estimatedTimeRemaining: 2
+      });
+      setGenerationProgress('Step 4/4: Finalizing...');
+      
       const jsonString = JSON.stringify(result, null, 2);
       setJsonText(jsonString);
-      setGenerationProgress('✅ Generation complete!');
+      
+      // Success!
+      setProgressDetails({
+        step: 4,
+        totalSteps: 4,
+        currentTask: 'Complete!',
+        estimatedTimeRemaining: 0
+      });
+      setGenerationProgress(`✅ Successfully generated ${result.fields.length} fields!`);
+      
       setTimeout(() => {
         setActiveMethod('paste');
         setGenerationProgress('');
-      }, 1000);
+        setProgressDetails({
+          step: 0,
+          totalSteps: 4,
+          currentTask: '',
+          estimatedTimeRemaining: 0
+        });
+      }, 1500);
+      
     } catch (error) {
       setGenerationProgress('');
+      setProgressDetails({
+        step: 0,
+        totalSteps: 4,
+        currentTask: '',
+        estimatedTimeRemaining: 0
+      });
+      
       let errorMessage = error.message;
-      if (error.message.includes('invalid JSON') || error.message.includes('parse')) {
-        errorMessage += '\n\n💡 Suggestions:\n• Try simplifying your field descriptions\n• Remove special characters';
+      
+      // Check if we have any partial results
+      if (jsonText && jsonText.length > 0) {
+        setPartialResult({
+          json: jsonText,
+          error: errorMessage
+        });
+        errorMessage = `Generation partially completed. ${errorMessage}\n\n✅ Some fields were generated. You can import them below or retry.`;
+      } else {
+        if (error.message.includes('invalid JSON') || error.message.includes('parse')) {
+          errorMessage += '\n\n💡 Suggestions:\n• Try simplifying your field descriptions\n• Remove special characters\n• Break into smaller sections';
+        }
       }
+      
       setError(errorMessage);
     } finally {
       setIsGenerating(false);
+      setGenerationStartTime(0);
+    }
+  };
+
+  // NEW: Retry with same input
+  const handleRetry = () => {
+    setError('');
+    setPartialResult(null);
+    handleAiGenerate();
+  };
+
+  // NEW: Import partial results
+  const handleImportPartial = () => {
+    if (partialResult && partialResult.json) {
+      try {
+        const parsed = JSON.parse(partialResult.json);
+        onImport(parsed);
+      } catch (error) {
+        setError('Could not parse partial results: ' + error.message);
+      }
     }
   };
 
@@ -106,7 +238,19 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
     }
   };
 
-  const clearError = () => setError('');
+  const clearError = () => {
+    setError('');
+    setPartialResult(null);
+  };
+
+  // NEW: Format time remaining
+  const formatTime = (seconds) => {
+    if (seconds <= 0) return 'Finishing...';
+    if (seconds < 60) return `~${seconds}s remaining`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `~${mins}m ${secs}s remaining`;
+  };
 
   const overlayStyle = {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -155,6 +299,39 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
               background: 'none', border: 'none', color: '#dc2626',
               cursor: 'pointer', fontSize: '1.25rem', lineHeight: 1, padding: 0
             }}>×</button>
+          </div>
+        )}
+
+        {/* NEW: Partial results actions */}
+        {partialResult && (
+          <div style={{
+            padding: '12px 16px', backgroundColor: darkMode ? 'rgba(234, 179, 8, 0.1)' : '#fefce8',
+            border: `1px solid ${darkMode ? '#ca8a04' : '#fde047'}`, borderRadius: '8px',
+            marginBottom: '16px'
+          }}>
+            <div style={{ fontSize: '0.875rem', color: darkMode ? '#fbbf24' : '#ca8a04', marginBottom: '12px' }}>
+              <strong>Partial Success:</strong> Some fields were generated successfully.
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={handleImportPartial} style={{
+                padding: '6px 12px', border: 'none', borderRadius: '6px',
+                fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                backgroundColor: '#22c55e', color: 'white',
+                display: 'flex', alignItems: 'center', gap: '6px'
+              }}>
+                <CheckCircle size={14} />
+                Import What We Got
+              </button>
+              <button onClick={handleRetry} style={{
+                padding: '6px 12px', border: 'none', borderRadius: '6px',
+                fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                backgroundColor: '#3b82f6', color: 'white',
+                display: 'flex', alignItems: 'center', gap: '6px'
+              }}>
+                <RefreshCw size={14} />
+                Retry Generation
+              </button>
+            </div>
           </div>
         )}
 
@@ -212,14 +389,70 @@ export default function ImportModal({ onClose, onImport, darkMode }) {
               }}>📄 Upload File (.txt, .md, .docx)</label>
             </div>
 
+            {/* NEW: Enhanced progress display with time estimate */}
             {generationProgress && (
               <div style={{
-                padding: '12px', backgroundColor: darkMode ? '#0f172a' : '#eff6ff',
+                padding: '16px', backgroundColor: darkMode ? '#0f172a' : '#eff6ff',
                 border: `1px solid ${darkMode ? '#1e40af' : '#bfdbfe'}`, borderRadius: '8px',
-                marginBottom: '16px', fontSize: '0.875rem', color: darkMode ? '#93c5fd' : '#1e40af',
-                display: 'flex', alignItems: 'center', gap: '8px'
+                marginBottom: '16px'
               }}>
-                <span>⏳</span><span>{generationProgress}</span>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  marginBottom: '12px'
+                }}>
+                  <div style={{ 
+                    fontSize: '0.875rem', 
+                    color: darkMode ? '#93c5fd' : '#1e40af',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span>⏳</span>
+                    <span>{generationProgress}</span>
+                  </div>
+                  {progressDetails.estimatedTimeRemaining > 0 && (
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: darkMode ? '#60a5fa' : '#2563eb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <Clock size={12} />
+                      <span>{formatTime(progressDetails.estimatedTimeRemaining)}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Progress bar */}
+                {progressDetails.step > 0 && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <div style={{
+                      width: '100%',
+                      height: '8px',
+                      backgroundColor: darkMode ? '#1e3a8a' : '#dbeafe',
+                      borderRadius: '4px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        width: `${(progressDetails.step / progressDetails.totalSteps) * 100}%`,
+                        height: '100%',
+                        backgroundColor: '#3b82f6',
+                        transition: 'width 0.3s ease',
+                        borderRadius: '4px'
+                      }} />
+                    </div>
+                    <div style={{
+                      fontSize: '0.6875rem',
+                      color: darkMode ? '#93c5fd' : '#1e40af',
+                      marginTop: '4px'
+                    }}>
+                      {progressDetails.currentTask}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
