@@ -22,7 +22,9 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-/* Scrollbar styling */
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -51,4 +53,418 @@ code {
 
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
+}
+
+/* ============================================
+   RESPONSIVE UTILITIES
+   ============================================ */
+
+/* Mobile-first base styles */
+@media screen and (max-width: 767px) {
+  /* Prevent zoom on input focus (iOS) */
+  input, 
+  select, 
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Touch-friendly buttons */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Reduce padding on mobile */
+  .container {
+    padding: 16px !important;
+  }
+
+  /* Stack columns on mobile */
+  .grid-2-cols {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Full-width modals */
+  .modal {
+    width: 95% !important;
+    max-width: 95% !important;
+    margin: 10px !important;
+  }
+
+  /* Hide desktop-only elements */
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Responsive text sizes */
+  h1 {
+    font-size: 1.5rem !important;
+  }
+
+  h2 {
+    font-size: 1.25rem !important;
+  }
+
+  h3 {
+    font-size: 1.125rem !important;
+  }
+}
+
+/* Tablet styles */
+@media screen and (min-width: 768px) and (max-width: 1023px) {
+  /* Narrow sidebar on tablet */
+  .sidebar {
+    width: 280px !important;
+  }
+
+  /* 2-column grid on tablet */
+  .grid-2-cols {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Hide mobile-only elements */
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+/* Desktop styles */
+@media screen and (min-width: 1024px) {
+  /* Hide mobile-only elements */
+  .mobile-only {
+    display: none !important;
+  }
+
+  /* Full sidebar on desktop */
+  .sidebar {
+    width: 320px !important;
+  }
+
+  /* 2-column grid on desktop */
+  .grid-2-cols {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ============================================
+   MOBILE SIDEBAR ANIMATIONS
+   ============================================ */
+@media screen and (max-width: 767px) {
+  .sidebar-mobile {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: -100%;
+    width: 280px;
+    z-index: 1000;
+    transition: left 0.3s ease;
+  }
+
+  .sidebar-mobile.open {
+    left: 0;
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .sidebar-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* ============================================
+   TOUCH & MOBILE OPTIMIZATIONS
+   ============================================ */
+
+/* Remove tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth scrolling on mobile */
+.scrollable {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+}
+
+/* Prevent text selection on buttons */
+button {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* ============================================
+   RESPONSIVE MODAL
+   ============================================ */
+@media screen and (max-width: 767px) {
+  .import-modal {
+    width: 95vw !important;
+    max-height: 90vh !important;
+    padding: 20px !important;
+  }
+
+  .import-modal textarea {
+    min-height: 200px !important;
+    font-size: 16px !important;
+  }
+
+  .import-modal button {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+}
+
+/* ============================================
+   FIELD EDITOR RESPONSIVE
+   ============================================ */
+@media screen and (max-width: 767px) {
+  .field-editor {
+    padding: 16px !important;
+  }
+
+  .field-editor-section {
+    padding: 16px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .field-editor-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .checkbox-container {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+}
+
+/* ============================================
+   XML PREVIEW RESPONSIVE
+   ============================================ */
+@media screen and (max-width: 767px) {
+  .xml-preview {
+    border-radius: 8px !important;
+    margin: 16px !important;
+  }
+
+  .xml-preview pre {
+    font-size: 0.75rem !important;
+    padding: 12px !important;
+  }
+
+  .xml-preview-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .xml-preview-buttons {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+
+  .xml-preview-buttons button {
+    flex: 1;
+  }
+}
+
+/* ============================================
+   TABS RESPONSIVE
+   ============================================ */
+@media screen and (max-width: 767px) {
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab {
+    white-space: nowrap;
+    font-size: 0.8125rem !important;
+    padding: 10px 16px !important;
+  }
+}
+
+/* ============================================
+   HEADER RESPONSIVE
+   ============================================ */
+@media screen and (max-width: 767px) {
+  .header {
+    padding: 12px 16px !important;
+  }
+
+  .header-title {
+    font-size: 1rem !important;
+  }
+
+  .header-subtitle {
+    font-size: 0.6875rem !important;
+  }
+
+  .header-logo {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .header-buttons {
+    gap: 8px !important;
+  }
+
+  .header-button {
+    padding: 6px 12px !important;
+    font-size: 0.8125rem !important;
+  }
+}
+
+/* ============================================
+   SIDEBAR RESPONSIVE
+   ============================================ */
+@media screen and (max-width: 767px) {
+  .sidebar-header {
+    padding: 12px !important;
+  }
+
+  .sidebar-button {
+    padding: 8px 12px !important;
+    font-size: 0.8125rem !important;
+  }
+
+  .sidebar-filter {
+    padding: 6px 10px !important;
+    font-size: 0.8125rem !important;
+  }
+
+  .field-item {
+    padding: 10px !important;
+  }
+
+  .field-label {
+    font-size: 0.8125rem !important;
+  }
+
+  .field-api-name {
+    font-size: 0.6875rem !important;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+
+/* Focus visible for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Skip to content link */
+.skip-to-content {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #2563eb;
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  z-index: 100;
+}
+
+.skip-to-content:focus {
+  top: 0;
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  .sidebar,
+  .header,
+  .tabs,
+  button {
+    display: none !important;
+  }
+
+  .xml-preview {
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  * {
+    color: #000 !important;
+    background: #fff !important;
+  }
+}
+
+/* ============================================
+   REDUCED MOTION
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   DARK MODE IMPROVEMENTS
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  /* Auto dark mode for system preference */
+  :root:not([data-theme]) {
+    color-scheme: dark;
+  }
+}
+
+/* ============================================
+   LANDSCAPE MODE (Mobile)
+   ============================================ */
+@media screen and (max-width: 767px) and (orientation: landscape) {
+  .header {
+    padding: 8px 16px !important;
+  }
+
+  .header-logo {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .sidebar {
+    width: 240px !important;
+  }
+
+  .field-editor {
+    padding: 12px !important;
+  }
+}
+
+/* ============================================
+   SAFE AREA INSETS (iPhone notch, etc.)
+   ============================================ */
+@supports (padding: max(0px)) {
+  .header,
+  .sidebar,
+  .main-content {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
+  .sidebar {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
 }
