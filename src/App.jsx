@@ -1150,7 +1150,7 @@ function FieldItem({ field, isSelected, onSelect, onDelete, darkMode }) {
           <div style={styles.apiName}>{field.apiName}</div>
         </div>
         {field.required && (
-          <span style={styles.requiredStar} title="Required Field">â˜…</span>
+          <span style={styles.requiredStar} title="Required Field">*</span>
         )}
       </div>
       <button 
